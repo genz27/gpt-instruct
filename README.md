@@ -107,7 +107,15 @@
 npx --yes github:genz27/gpt-instruct
 ```
 
-此命令安装的是提示词，而非模型或 Codex 本身；安装后重启 Codex。默认使用 `CODEX_HOME`，未设置时使用 `~/.codex`。安装前会备份已有 `config.toml`，保留其他配置。回滚可克隆本仓库后运行 `python3 codex-instruct.py --reset --codex-dir ~/.codex`（若设置了 `CODEX_HOME`，请将路径替换为该目录）。
+此命令安装的是提示词，而非模型或 Codex 本身；安装后重启 Codex。默认使用 `CODEX_HOME`，未设置时使用 `~/.codex`。安装前会备份已有 `config.toml`，保留其他配置。
+
+恢复安装前的提示词配置（安装和恢复须使用相同的 `CODEX_HOME`）：
+
+```bash
+npx --yes github:genz27/gpt-instruct --reset
+```
+
+恢复时会备份当前配置，仅在当前配置仍指向此版本时恢复原配置项。修改过或安装前已存在的提示词文件会保留。完成后重启 Codex。
 
 当前稳定 ZIP：[`gpt-5.6-sol-v45.zip`](gpt-5.6-sol-v45.zip)  
 gpt-6-astra v2 预发布 ZIP：[`gpt-6-astra-v2-rc1.zip`](gpt-6-astra-v2-rc1.zip)（内含 `gpt-6-astra-v2-rc1.md`；双次 A 均 3/4；B 非云 42/50、云端重复 23/48；C 未运行）  

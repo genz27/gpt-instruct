@@ -39,8 +39,18 @@ function atomicWrite(file, data) {
   }
 }
 
+function readState(statePath) {
+  if (fs.lstatSync(statePath).isSymbolicLink()) throw new Error('State file is a symlink');
+  const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  if (!state || state.version !== 2 || !state.managed_prompts || typeof state.managed_prompts !== 'object' || Array.isArray(state.managed_prompts)) throw new Error('Invalid installer state');
+  if (state.previous_model_instructions_line !== null && (typeof state.previous_model_instructions_line !== 'string' || !/^\s*model_instructions_file\s*=\s*(['"])(.*?)\1\s*(?:#.*)?$/.test(state.previous_model_instructions_line))) throw new Error('Invalid previous instruction in installer state');
+  for (const [name, metadata] of Object.entries(state.managed_prompts)) {
+    if (!name || /[\\/]/.test(name) || !name.toLowerCase().endsWith('.md') || !metadata || !/^[0-9a-f]{64}$/.test(metadata.sha256) || typeof metadata.existed_before !== 'boolean') throw new Error('Invalid managed prompt in installer state');
+  }
+  return state;
+}
+
 function install() {
-  if (process.argv.length !== 2) throw new Error('This installer takes no arguments; set CODEX_HOME to select a directory.');
   const prompt = promptFromArchive();
   const home = path.resolve(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'));
   const config = path.join(home, 'config.toml');
@@ -58,13 +68,7 @@ function install() {
   if (oldLine !== null && !/^\s*model_instructions_file\s*=\s*(['"])(.*?)\1\s*(?:#.*)?$/.test(oldLine)) throw new Error('Unsupported model_instructions_file entry');
   let state;
   if (fs.existsSync(statePath)) {
-    if (fs.lstatSync(statePath).isSymbolicLink()) throw new Error('State file is a symlink');
-    state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-    if (!state || state.version !== 2 || !state.managed_prompts || typeof state.managed_prompts !== 'object' || Array.isArray(state.managed_prompts)) throw new Error('Invalid installer state');
-    if (state.previous_model_instructions_line !== null && (typeof state.previous_model_instructions_line !== 'string' || !/^\s*model_instructions_file\s*=\s*(['"])(.*?)\1\s*(?:#.*)?$/.test(state.previous_model_instructions_line))) throw new Error('Invalid previous instruction in installer state');
-    for (const [name, metadata] of Object.entries(state.managed_prompts)) {
-      if (!name || /[\\/]/.test(name) || !name.toLowerCase().endsWith('.md') || !metadata || !/^[0-9a-f]{64}$/.test(metadata.sha256) || typeof metadata.existed_before !== 'boolean') throw new Error('Invalid managed prompt in installer state');
-    }
+    state = readState(statePath);
   } else {
     if (oldLine && /model_instructions_file\s*=\s*["'](?:\.\/)?gpt-(?:5\.6-sol|6(?:\.1)?-(?:astra|sol))/.test(oldLine)) throw new Error('Existing managed installation has no state; use the Python installer to migrate it');
     state = { version: 2, previous_model_instructions_line: oldLine, managed_prompts: {} };
@@ -94,4 +98,50 @@ function install() {
   console.log('Restart Codex to load the instructions.');
 }
 
-try { install(); } catch (error) { console.error(`Installation failed: ${error.message}`); process.exitCode = 1; }
+function restore() {
+  const home = path.resolve(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'));
+  const config = path.join(home, 'config.toml');
+  const statePath = path.join(home, stateName);
+  if (!fs.existsSync(statePath)) throw new Error('No installer state found; nothing was changed');
+  const state = readState(statePath);
+  if (!Object.prototype.hasOwnProperty.call(state.managed_prompts, filename)) throw new Error('This version is not recorded in installer state');
+  if (!fs.existsSync(config) || fs.lstatSync(config).isSymbolicLink()) throw new Error('Config is missing or is a symlink');
+  const original = fs.readFileSync(config, 'utf8');
+  const lines = original.match(/[^\n]*\n|[^\n]+$/g) || [];
+  const table = lines.findIndex(line => /^\s*\[/.test(line));
+  const indexes = lines.slice(0, table < 0 ? lines.length : table).map((line, i) => /^\s*model_instructions_file\s*=/.test(line) ? i : -1).filter(i => i >= 0);
+  if (indexes.length > 1) throw new Error('Multiple top-level model_instructions_file entries');
+  const line = indexes.length ? lines[indexes[0]].replace(/\r?\n$/, '') : '';
+  const match = /^\s*model_instructions_file\s*=\s*(['"])(.*?)\1\s*(?:#.*)?$/.exec(line);
+  const current = match && match[2].replace(/\\/g, '/').replace(/^\.\//, '');
+  if (current === filename) {
+    const backup = `${config}.bak_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    fs.copyFileSync(config, backup, fs.constants.COPYFILE_EXCL);
+    const i = indexes[0];
+    const newline = lines[i].endsWith('\r\n') ? '\r\n' : lines[i].endsWith('\n') ? '\n' : '';
+    if (state.previous_model_instructions_line === null) lines.splice(i, 1);
+    else lines[i] = state.previous_model_instructions_line + newline;
+    atomicWrite(config, lines.join(''));
+    console.log(`Restored configuration. Backup: ${backup}`);
+  } else {
+    console.log('Current instruction setting was changed; leaving it unchanged.');
+  }
+  const destination = path.join(home, filename);
+  const metadata = state.managed_prompts[filename];
+  if (fs.existsSync(destination) && !fs.lstatSync(destination).isSymbolicLink() && !metadata.existed_before && hash(fs.readFileSync(destination)) === metadata.sha256) {
+    fs.unlinkSync(destination);
+    console.log(`Removed ${filename}`);
+  } else if (fs.existsSync(destination)) {
+    console.log(`Preserved ${filename} (modified or pre-existing).`);
+  }
+  delete state.managed_prompts[filename];
+  if (Object.keys(state.managed_prompts).length) atomicWrite(statePath, JSON.stringify(state, null, 2) + '\n');
+  else fs.unlinkSync(statePath);
+  console.log('Restart Codex to load the restored configuration.');
+}
+
+try {
+  if (process.argv.length === 2) install();
+  else if (process.argv.length === 3 && process.argv[2] === '--reset') restore();
+  else throw new Error('Usage: gpt-instruct-installer [--reset]');
+} catch (error) { console.error(`Operation failed: ${error.message}`); process.exitCode = 1; }

@@ -38,6 +38,33 @@ class NodeInstallerTests(unittest.TestCase):
             self.assertEqual(prompt.read_text(encoding="utf-8"), "user content")
             self.assertFalse((home / "config.toml").exists())
 
+    def test_node_reset_restores_config_and_preserves_later_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            config = home / "config.toml"
+            config.write_text('model_instructions_file = "./old.md"\nmodel = "old"\n', encoding="utf-8")
+            env = {**os.environ, "CODEX_HOME": directory}
+            subprocess.run(["node", str(ROOT / "install.js")], env=env, check=True, capture_output=True)
+            config.write_text(config.read_text(encoding="utf-8").replace('model = "old"', 'model = "new"'), encoding="utf-8")
+            subprocess.run(["node", str(ROOT / "install.js"), "--reset"], env=env, check=True, capture_output=True)
+            self.assertEqual(config.read_text(encoding="utf-8"), 'model_instructions_file = "./old.md"\nmodel = "new"\n')
+            self.assertFalse((home / "gpt-6.1-sol-v1-rc2.md").exists())
+            self.assertFalse((home / ".gpt56-sol-instruct-state.json").exists())
+            self.assertEqual(len(list(home.glob("config.toml.bak_*"))), 2)
+
+    def test_node_reset_preserves_user_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            env = {**os.environ, "CODEX_HOME": directory}
+            subprocess.run(["node", str(ROOT / "install.js")], env=env, check=True, capture_output=True)
+            config = home / "config.toml"
+            config.write_text('model_instructions_file = "./new.md"\n', encoding="utf-8")
+            prompt = home / "gpt-6.1-sol-v1-rc2.md"
+            prompt.write_text("user content", encoding="utf-8")
+            subprocess.run(["node", str(ROOT / "install.js"), "--reset"], env=env, check=True, capture_output=True)
+            self.assertEqual(config.read_text(encoding="utf-8"), 'model_instructions_file = "./new.md"\n')
+            self.assertEqual(prompt.read_text(encoding="utf-8"), "user content")
+
 
 if __name__ == "__main__":
     unittest.main()
