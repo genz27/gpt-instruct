@@ -1,0 +1,9 @@
+{
+  "name": "gpt-instruct-installer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Install the gpt-6.1-sol-v1-rc2 Codex instructions",
+  "files": ["install.js", "gpt-6.1-sol-v1-rc2.zip"],
+  "bin": { "gpt-instruct-installer": "install.js" },
+  "engines": { "node": ">=18" }
+}

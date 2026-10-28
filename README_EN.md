@@ -97,6 +97,16 @@ The `gpt-6.1-sol` chart uses case-level human verdicts; `×2` marks an equal sec
 
 ## Stable Release and Quick Start 📦
 
+### One-command Node.js install for gpt-6.1-sol-v1-rc2
+
+With Node.js 18 or later installed, run:
+
+```bash
+npx --yes github:genz27/gpt-instruct
+```
+
+This installs the instructions, not the model or Codex itself. Restart Codex afterwards. The installer uses `CODEX_HOME` when set, otherwise `~/.codex`, and backs up an existing `config.toml` while preserving other settings. To roll back, clone this repository and run `python3 codex-instruct.py --reset --codex-dir ~/.codex` (replace the path with `CODEX_HOME` if set).
+
 Current stable ZIP: [`gpt-5.6-sol-v45.zip`](gpt-5.6-sol-v45.zip)  
 gpt-6-astra v2 prerelease ZIP: [`gpt-6-astra-v2-rc1.zip`](gpt-6-astra-v2-rc1.zip) (contains `gpt-6-astra-v2-rc1.md`; both A runs 3/4; B non-cloud 42/50 and cloud repeats 23/48; C not run)  
 gpt-6.1-sol prerelease ZIP: [`gpt-6.1-sol-v1-rc2.zip`](gpt-6.1-sol-v1-rc2.zip) (contains `gpt-6.1-sol-v1-rc2.md`; both A runs 3/4; B non-cloud 34/50 and cloud repeats 22/48; C not run)

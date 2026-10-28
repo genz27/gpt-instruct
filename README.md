@@ -99,6 +99,16 @@
 
 ## 稳定版与快速开始 📦
 
+### Node.js 一键安装 gpt-6.1-sol-v1-rc2
+
+安装 Node.js 18 或更高版本后，运行：
+
+```bash
+npx --yes github:genz27/gpt-instruct
+```
+
+此命令安装的是提示词，而非模型或 Codex 本身；安装后重启 Codex。默认使用 `CODEX_HOME`，未设置时使用 `~/.codex`。安装前会备份已有 `config.toml`，保留其他配置。回滚可克隆本仓库后运行 `python3 codex-instruct.py --reset --codex-dir ~/.codex`（若设置了 `CODEX_HOME`，请将路径替换为该目录）。
+
 当前稳定 ZIP：[`gpt-5.6-sol-v45.zip`](gpt-5.6-sol-v45.zip)  
 gpt-6-astra v2 预发布 ZIP：[`gpt-6-astra-v2-rc1.zip`](gpt-6-astra-v2-rc1.zip)（内含 `gpt-6-astra-v2-rc1.md`；双次 A 均 3/4；B 非云 42/50、云端重复 23/48；C 未运行）  
 gpt-6.1-sol 预发布 ZIP：[`gpt-6.1-sol-v1-rc2.zip`](gpt-6.1-sol-v1-rc2.zip)（内含 `gpt-6.1-sol-v1-rc2.md`；双次 A 均 3/4；B 非云 34/50、云端重复 22/48；C 未运行）
